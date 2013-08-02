@@ -1,6 +1,8 @@
-package com.neatocode.yelparound;
-
+package edu.oregonstate.robotics;
+// adapted from https://github.com/lnanek/GlassSensorTest
 import java.util.List;
+
+import com.neatocode.yelparound.R;
 
 import android.app.Activity;
 import android.content.Context;
@@ -49,6 +51,8 @@ public class MainActivity extends Activity implements SensorEventListener,
 	Double gpsLat;
 	
 	Double gpsLon;
+	
+	RosSensorIO sensorIO;
 	
 	private static void removeBackgrounds(final View aView) {
 		aView.setBackgroundDrawable(null);
@@ -109,6 +113,9 @@ public class MainActivity extends Activity implements SensorEventListener,
 				0, 0, this);
 		//mLocationManager.requestLocationUpdates(
 		//		LocationManager.NETWORK_PROVIDER, 0, 0, this);
+		this.sensorIO = new RosSensorIO("192.168.0.158", 9995);
+		Thread clientThread = new Thread(this.sensorIO);
+		clientThread.start();
 	}
 
 	@Override
@@ -138,6 +145,7 @@ public class MainActivity extends Activity implements SensorEventListener,
 		// Do something with these orientation angles.
 		text.setText("azimuth, pitch, roll, lat, lon:\n" + azimuth_angle + "\n"
 				+ pitch_angle + "\n" + roll_angle);
+		this.sensorIO.sendRPY(roll_angle, pitch_angle, azimuth_angle);
 	}
 
 	@Override
