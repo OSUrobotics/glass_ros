@@ -23,8 +23,18 @@ public class RosSensorIO implements Runnable {
 			bb.putFloat(-roll).putFloat(pitch).putFloat(-yaw+180);
 			this.outStream.write(bb.array());
 		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (Exception e) {}
+			Log.w("RosSensorIO", "IO Exception: trying to reconnect");
+			try {
+				this.client.close();
+				this.run();
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+			
+		} catch (Exception e) {
+			@SuppressWarnings("unused")
+			int a = 5;
+		}
 	}
 
 	public void run() {

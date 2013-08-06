@@ -2,7 +2,7 @@ package edu.oregonstate.robotics;
 // adapted from https://github.com/lnanek/GlassSensorTest
 import java.util.List;
 
-import com.neatocode.yelparound.R;
+import edu.oregonstate.robotics.R;
 
 import android.app.Activity;
 import android.content.Context;
@@ -113,7 +113,7 @@ public class MainActivity extends Activity implements SensorEventListener,
 				0, 0, this);
 		//mLocationManager.requestLocationUpdates(
 		//		LocationManager.NETWORK_PROVIDER, 0, 0, this);
-		this.sensorIO = new RosSensorIO("192.168.0.158", 9995);
+		this.sensorIO = new RosSensorIO("192.168.43.202", 9999);
 		Thread clientThread = new Thread(this.sensorIO);
 		clientThread.start();
 	}
