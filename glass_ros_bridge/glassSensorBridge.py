@@ -11,8 +11,8 @@ class SocketHandler(SocketServer.BaseRequestHandler):
         self.br = tf.TransformBroadcaster()
         print "Made broadcaster"
         rate = rospy.Rate(50)
-        while not rospy.is_shutdown():
-            self.data = self.request.recv(1024)
+        self.data = self.request.recv(1024)
+        while not rospy.is_shutdown() and self.data:
             if self.data:
                 try:
                     rpy = numpy.radians(struct.unpack('>3f', self.data))
@@ -23,10 +23,12 @@ class SocketHandler(SocketServer.BaseRequestHandler):
                 except Exception, e:
                     if type(e) == struct.error:
                         print "Couldn't unpack ", self.data
-        rate.sleep()
+            self.data = self.request.recv(1024)
+            rate.sleep()
+        print 'Disconnect'
 
 if __name__ == "__main__":
-    HOST, PORT = "192.168.0.157", 9992
+    HOST, PORT = "192.168.43.202", 9999
     if len(sys.argv) > 1:
         HOST, PORT = sys.argv[1], int(sys.argv[2])
     print 'Listening on %s:%s' % (HOST, PORT)
