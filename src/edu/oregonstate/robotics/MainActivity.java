@@ -34,7 +34,7 @@ public class MainActivity extends Activity implements SensorEventListener,
 
 	private SensorManager mSensorManager;
 
-	private Sensor mOrientation;
+	private Sensor mOrientation, mAcceleration;
 
 	private LocationManager mLocationManager;
 	
@@ -90,7 +90,9 @@ public class MainActivity extends Activity implements SensorEventListener,
 		}
 		
 		mOrientation = mSensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION);
-
+		
+		mAcceleration = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+		
 		mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 		List<String> providers = mLocationManager.getAllProviders();
 		for(String provider : providers ) {
@@ -129,6 +131,8 @@ public class MainActivity extends Activity implements SensorEventListener,
 		super.onResume();
 		mSensorManager.registerListener(this, mOrientation,
 				SensorManager.SENSOR_DELAY_NORMAL);
+		mSensorManager.registerListener(this, mAcceleration,
+				SensorManager.SENSOR_DELAY_NORMAL);
 	}
 
 	@Override
@@ -139,13 +143,31 @@ public class MainActivity extends Activity implements SensorEventListener,
 
 	@Override
 	public void onSensorChanged(SensorEvent event) {
-		float azimuth_angle = event.values[0];
-		float pitch_angle = event.values[1];
-		float roll_angle = event.values[2];
-		// Do something with these orientation angles.
-		text.setText("azimuth, pitch, roll, lat, lon:\n" + azimuth_angle + "\n"
-				+ pitch_angle + "\n" + roll_angle);
-		this.sensorIO.sendRPY(roll_angle, pitch_angle, azimuth_angle);
+		if(Sensor.TYPE_ORIENTATION == event.sensor.getType()) {
+			float azimuth_angle = event.values[0];
+			float pitch_angle = event.values[1];
+			float roll_angle = event.values[2];
+			// Do something with these orientation angles.
+			text.setText(
+				"roll, pitch, yaw = \n"
+				+ roll_angle  + "\n"
+				+ pitch_angle + "\n"
+				+ azimuth_angle
+			);
+			this.sensorIO.sendOrientation(roll_angle, pitch_angle, azimuth_angle);
+		} else if(Sensor.TYPE_ACCELEROMETER == event.sensor.getType()) {
+			float az = event.values[0];
+			float ay = event.values[1];
+			float ax = event.values[2];
+
+			text.setText(
+				"ax, ay, az = \n"
+				+ ax + "\n"
+				+ ay + "\n"
+				+ az
+			);
+			this.sensorIO.sendAcceleration(ax, ay, az);
+		}
 	}
 
 	@Override

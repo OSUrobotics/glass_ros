@@ -4,6 +4,7 @@ import java.net.*;
 import java.io.*;
 import java.nio.ByteBuffer;
 import android.util.Log;
+import android.hardware.Sensor;
 
 public class RosSensorIO implements Runnable {
 	Socket client;
@@ -16,11 +17,12 @@ public class RosSensorIO implements Runnable {
 		this.port = port;
 	}
 	
-	public void sendRPY(float roll, float pitch, float yaw) {
+	private void sendPrefixedTriplet(int prefix, float a, float b, float c) {
 		try {			
-			// this can be deserialized in python with struct.unpack('>3f', data)
-			ByteBuffer bb = ByteBuffer.allocate(12);
-			bb.putFloat(-roll).putFloat(pitch).putFloat(-yaw+180);
+			// this can be deserialized in python with struct.unpack('>3f', data[1:])
+			// the first byte is a char representing which sensor the data is from
+			ByteBuffer bb = ByteBuffer.allocate(16);
+			bb.putInt(prefix).putFloat(a).putFloat(b).putFloat(c);
 			this.outStream.write(bb.array());
 		} catch (IOException e) {
 			Log.w("RosSensorIO", "IO Exception: trying to reconnect");
@@ -33,8 +35,16 @@ public class RosSensorIO implements Runnable {
 			
 		} catch (Exception e) {
 			@SuppressWarnings("unused")
-			int a = 5;
+			int q = 5;
 		}
+	}
+	
+	public void sendAcceleration(float ax, float ay, float az) {
+		this.sendPrefixedTriplet(Sensor.TYPE_ACCELEROMETER, ax, ay, az);
+	}
+	
+	public void sendOrientation(float roll, float pitch, float yaw) {
+		this.sendPrefixedTriplet(Sensor.TYPE_ORIENTATION, -roll, pitch, -yaw+180);
 	}
 
 	public void run() {
