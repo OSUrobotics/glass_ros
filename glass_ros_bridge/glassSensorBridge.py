@@ -19,7 +19,7 @@ class SocketHandler(SocketServer.BaseRequestHandler):
         self.imu_pub = rospy.Publisher('imu', Imu)
         print "Made broadcaster"
         rate = rospy.Rate(50)
-        self.data = self.request.recv(1024)
+        self.data = self.request.recv(16)
         while not rospy.is_shutdown() and self.data:
             if self.data:
                 try:
@@ -48,7 +48,7 @@ class SocketHandler(SocketServer.BaseRequestHandler):
                     if type(e) == struct.error:
                         # import pdb; pdb.set_trace()
                         print "Couldn't unpack ", self.data.__repr__(), 'with length', len(self.data)
-            self.data = self.request.recv(1024)
+            self.data = self.request.recv(16)
             rate.sleep()
         print 'Disconnect'
 
