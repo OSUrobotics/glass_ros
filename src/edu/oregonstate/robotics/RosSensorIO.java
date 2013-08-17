@@ -3,60 +3,66 @@ package edu.oregonstate.robotics;
 import java.net.*;
 import java.io.*;
 import java.nio.ByteBuffer;
+
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.hardware.Sensor;
+import de.timroes.axmlrpc.*;
+
+import org.apache.xmlrpc.XmlRpcException;
+import org.apache.xmlrpc.client.XmlRpcClient;
+import org.apache.xmlrpc.client.XmlRpcClientConfigImpl;
+
 
 public class RosSensorIO implements Runnable {
-	Socket client;
-	DataOutputStream outStream;
-	String serverName;
-	int port;	
+	XmlRpcClient client;
+	XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
+	URL serverURL;
+	static final String LOG_TAG = "RosSensorIO";
+	Handler handler;
 	
 	RosSensorIO(String serverName, int port) {
-		this.serverName = serverName;
-		this.port = port;
-	}
-	
-	private void sendPrefixedTriplet(int prefix, float a, float b, float c) {
-		try {			
-			// this can be deserialized in python with struct.unpack('>3f', data[1:])
-			// the first byte is a char representing which sensor the data is from
-			ByteBuffer bb = ByteBuffer.allocate(16);
-			bb.putInt(prefix).putFloat(a).putFloat(b).putFloat(c);
-			this.outStream.write(bb.array());
-		} catch (IOException e) {
-			Log.w("RosSensorIO", "IO Exception: trying to reconnect");
-			try {
-				this.client.close();
-				this.run();
-			} catch (IOException e1) {
-				e1.printStackTrace();
-			}
-			
-		} catch (Exception e) {
-			@SuppressWarnings("unused")
-			int q = 5;
+		try {
+			Log.i(LOG_TAG, "Connecting to " + serverName + ":" + port);
+			this.serverURL = new URL("http", serverName, port, "/android");
+			this.config.setServerURL(this.serverURL);
+		} catch (MalformedURLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
+	}
+		
+	public void callInLooper(final XmlRpcClient innerClient, final String method, final Object... params) {
+		this.handler.postAtFrontOfQueue(new Runnable() {
+			public void run() {
+				long start = System.currentTimeMillis();
+				try {
+//					innerClient.call(method, params);
+					innerClient.execute(method, params);
+				} catch (XmlRpcException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				Log.i(LOG_TAG, "Took " + (System.currentTimeMillis() - start));
+			}
+		});
 	}
 	
 	public void sendAcceleration(float ax, float ay, float az) {
-		this.sendPrefixedTriplet(Sensor.TYPE_ACCELEROMETER, ax, ay, az);
+		this.callInLooper(this.client, "imu", ax, ay, az);
 	}
 	
 	public void sendOrientation(float roll, float pitch, float yaw) {
-		this.sendPrefixedTriplet(Sensor.TYPE_ORIENTATION, -roll, pitch, -yaw+180);
+		this.callInLooper(this.client, "orientation", (int)roll, (int)pitch, (int)yaw);
 	}
 
 	public void run() {
-		try {
-			this.client = new Socket(this.serverName, this.port);
-			OutputStream outToServer = client.getOutputStream();
-			outStream = new DataOutputStream(outToServer);
-		} catch (UnknownHostException e) {
-			Log.e("RosSensorIO", "UnknownHostException", e);
-		} catch (IOException e) {
-			Log.e("RosSensorIO", "IOException", e);
-		}
+		Looper.prepare();
+		handler = new Handler();
+		this.client = new XmlRpcClient();
+		this.client.setConfig(this.config);
+		Looper.loop();
 	}
 
 }

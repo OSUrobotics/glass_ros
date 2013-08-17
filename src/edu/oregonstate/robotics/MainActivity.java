@@ -115,7 +115,7 @@ public class MainActivity extends Activity implements SensorEventListener,
 				0, 0, this);
 		//mLocationManager.requestLocationUpdates(
 		//		LocationManager.NETWORK_PROVIDER, 0, 0, this);
-		this.sensorIO = new RosSensorIO("192.168.43.202", 9999);
+		this.sensorIO = new RosSensorIO("10.68.0.112", 9999);
 		Thread clientThread = new Thread(this.sensorIO);
 		clientThread.start();
 	}
@@ -130,9 +130,9 @@ public class MainActivity extends Activity implements SensorEventListener,
 	protected void onResume() {
 		super.onResume();
 		mSensorManager.registerListener(this, mOrientation,
-				SensorManager.SENSOR_DELAY_NORMAL);
-		mSensorManager.registerListener(this, mAcceleration,
-				SensorManager.SENSOR_DELAY_NORMAL);
+				SensorManager.SENSOR_DELAY_FASTEST);
+//		mSensorManager.registerListener(this, mAcceleration,
+//				SensorManager.SENSOR_DELAY_FASTEST);
 	}
 
 	@Override
@@ -144,17 +144,17 @@ public class MainActivity extends Activity implements SensorEventListener,
 	@Override
 	public void onSensorChanged(SensorEvent event) {
 		if(Sensor.TYPE_ORIENTATION == event.sensor.getType()) {
-			float azimuth_angle = event.values[0];
-			float pitch_angle = event.values[1];
-			float roll_angle = event.values[2];
+			float yaw_angle = event.values[0];
+			float roll_angle = -event.values[1]+180;
+			float pitch_angle = event.values[2];
 			// Do something with these orientation angles.
 			text.setText(
 				"roll, pitch, yaw = \n"
 				+ roll_angle  + "\n"
 				+ pitch_angle + "\n"
-				+ azimuth_angle
+				+ yaw_angle
 			);
-			this.sensorIO.sendOrientation(roll_angle, pitch_angle, azimuth_angle);
+			this.sensorIO.sendOrientation(roll_angle, pitch_angle, yaw_angle);
 		} else if(Sensor.TYPE_ACCELEROMETER == event.sensor.getType()) {
 			float az = event.values[0];
 			float ay = event.values[1];
