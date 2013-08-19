@@ -17,12 +17,12 @@ public class RosSensorIO implements Runnable {
 		this.port = port;
 	}
 	
-	private void sendPrefixedTriplet(int prefix, float a, float b, float c) {
+	private synchronized void sendPrefixedTriplet(int prefix, float a, float b, float c) {
 		try {			
 			// this can be deserialized in python with struct.unpack('>3f', data[1:])
 			// the first byte is a char representing which sensor the data is from
 			ByteBuffer bb = ByteBuffer.allocate(16);
-			bb.putInt(prefix).putFloat(a).putFloat(b).putFloat(c);
+			bb.putInt(prefix).putFloat(a).putFloat(b).putFloat(c);//.putInt(999).putInt(999);
 			this.outStream.write(bb.array());
 		} catch (IOException e) {
 			Log.w("RosSensorIO", "IO Exception: trying to reconnect");
@@ -40,11 +40,13 @@ public class RosSensorIO implements Runnable {
 	}
 	
 	public void sendAcceleration(float ax, float ay, float az) {
-		this.sendPrefixedTriplet(Sensor.TYPE_ACCELEROMETER, ax, ay, az);
+//		this.sendPrefixedTriplet(Sensor.TYPE_ACCELEROMETER, ax, ay, az);
 	}
 	
 	public void sendOrientation(float roll, float pitch, float yaw) {
-		this.sendPrefixedTriplet(Sensor.TYPE_ORIENTATION, -roll, pitch, -yaw+180);
+//		this.sendPrefixedTriplet(Sensor.TYPE_ORIENTATION, -roll, pitch, -yaw+180);
+		this.sendPrefixedTriplet(Sensor.TYPE_ORIENTATION, -roll, pitch+90, -yaw);
+
 	}
 
 	public void run() {
