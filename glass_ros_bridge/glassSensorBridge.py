@@ -5,6 +5,7 @@ import sys
 import rospy, tf, numpy
 from tf.transformations import quaternion_from_euler
 from sensor_msgs.msg import Imu
+from geometry_msgs.msg import PoseStamped
 
 # See enum values at http://developer.android.com/reference/android/hardware/Sensor.html
 TYPE_ACCELEROMETER = 1
@@ -16,9 +17,10 @@ class SocketHandler(SocketServer.BaseRequestHandler):
     def handle(self):
         print "Handle"
         self.br = tf.TransformBroadcaster()
-        self.imu_pub = rospy.Publisher('imu', Imu)
+        self.imu_pub = rospy.Publisher('/android/imu', Imu)
+        self.pose_pub = rospy.Publisher('/android/pose', PoseStamped)
+        self.glass_base_frame = '/face_detection'
         print "Made broadcaster"
-        rate = rospy.Rate(50)
         self.data = self.request.recv(16)
         while not rospy.is_shutdown() and self.data:
             if self.data:
@@ -28,12 +30,18 @@ class SocketHandler(SocketServer.BaseRequestHandler):
                         rpy = numpy.radians(struct.unpack('>3f', self.data[4:]))
                         quat = quaternion_from_euler(*rpy)
                         print 'Orientation', quat
-                        self.br.sendTransform((0,0,0), quat, rospy.Time.now(), self.child_frame_id, 'world')
+                        stamp = rospy.Time.now()
+                        pose_msg = PoseStamped()
+                        pose_msg.header.frame_id = self.child_frame_id
+                        pose_msg.header.stamp = stamp
+                        pose_msg.pose.orientation.w = 1
+                        self.pose_pub.publish(pose_msg)
+                        self.br.sendTransform((0,0,0), quat, stamp, self.child_frame_id, self.glass_base_frame)
                     elif sensor == TYPE_ACCELEROMETER:
                         ax, ay, az = struct.unpack('>3f', self.data[4:])
                         print 'IMU', ax, ay, az
                         imu = Imu()
-                        imu.header.frame_id = self.child_frame_id
+                        imu.header.frame_id = self.glass_base_frame
                         imu.header.stamp = rospy.Time.now()
                         imu.orientation.w = 1
                         imu.linear_acceleration.x = ax
@@ -46,10 +54,8 @@ class SocketHandler(SocketServer.BaseRequestHandler):
 
                 except Exception, e:
                     if type(e) == struct.error:
-                        # import pdb; pdb.set_trace()
                         print "Couldn't unpack ", self.data.__repr__(), 'with length', len(self.data)
             self.data = self.request.recv(16)
-            rate.sleep()
         print 'Disconnect'
 
 if __name__ == "__main__":

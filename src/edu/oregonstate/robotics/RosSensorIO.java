@@ -40,7 +40,7 @@ public class RosSensorIO implements Runnable {
 	}
 	
 	public void sendAcceleration(float ax, float ay, float az) {
-//		this.sendPrefixedTriplet(Sensor.TYPE_ACCELEROMETER, ax, ay, az);
+		this.sendPrefixedTriplet(Sensor.TYPE_ACCELEROMETER, ax, ay, az);
 	}
 	
 	public void sendOrientation(float roll, float pitch, float yaw) {

@@ -115,7 +115,7 @@ public class MainActivity extends Activity implements SensorEventListener,
 				0, 0, this);
 		//mLocationManager.requestLocationUpdates(
 		//		LocationManager.NETWORK_PROVIDER, 0, 0, this);
-		this.sensorIO = new RosSensorIO("192.168.43.202", 9999);
+		this.sensorIO = new RosSensorIO("10.68.0.112", 9999);
 		Thread clientThread = new Thread(this.sensorIO);
 		clientThread.start();
 	}
