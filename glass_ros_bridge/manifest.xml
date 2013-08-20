@@ -1,7 +1,7 @@
 <package>
-  <description brief="face_frame">
+  <description brief="glass_ros_bridge">
 
-     face_frame
+    glass_ros_bridge
 
   </description>
   <author>Bill Smart</author>
