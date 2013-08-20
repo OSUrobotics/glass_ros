@@ -1,5 +1,5 @@
 <launch>
 	<node name="sensor_bridge" type="glassSensorBridge.py" pkg="glass_ros_bridge" args="10.68.0.1 9999"/>
 	<node name="face_frame" type="face_frame.py" pkg="glass_ros_bridge"/>
-	<include file="$(find face_detector)/launch/face_detector.narrow.launch)"/>
+	<include file="$(find face_detector)/launch/face_detector.narrow.launch"/>
 </launch>
