@@ -1,0 +1,21 @@
+<package>
+  <description brief="face_frame">
+
+     face_frame
+
+  </description>
+  <author>Bill Smart</author>
+  <license>BSD</license>
+
+  <review status="unreviewed" notes=""/>
+  <url></url>
+
+  <depend package="rospy" />
+  <depend package="tf" />
+  <depend package="sensor_msgs" />
+  <depend package="geometry_msgs" />
+  <depend package="people_msgs" />
+
+</package>
+
+
