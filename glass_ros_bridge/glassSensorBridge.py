@@ -4,12 +4,13 @@ import struct
 import sys
 import rospy, tf, numpy
 from tf.transformations import quaternion_from_euler
-from sensor_msgs.msg import Imu
+from sensor_msgs.msg import Imu, Illuminance
 from geometry_msgs.msg import PoseStamped
 
 # See enum values at http://developer.android.com/reference/android/hardware/Sensor.html
 TYPE_ACCELEROMETER = 1
 TYPE_ORIENTATION   = 3
+TYPE_LIGHT         = 5
 
 class SocketHandler(SocketServer.BaseRequestHandler):
     child_frame_id = 'glass'
@@ -19,6 +20,7 @@ class SocketHandler(SocketServer.BaseRequestHandler):
         self.br = tf.TransformBroadcaster()
         self.imu_pub = rospy.Publisher('/android/imu', Imu)
         self.pose_pub = rospy.Publisher('/android/pose', PoseStamped)
+        self.light_pub = rospy.Publisher('/android/light', Illuminance)
         self.glass_base_frame = '/face_detection'
         print "Made broadcaster"
         self.data = self.request.recv(16)
@@ -49,6 +51,15 @@ class SocketHandler(SocketServer.BaseRequestHandler):
                         imu.linear_acceleration.z = az
 
                         self.imu_pub.publish(imu)
+                    elif sensor == TYPE_LIGHT:
+                        l, _, _ = struct.unpack('>3f', self.data[4:])
+                        print 'Light', l
+                        ill = Illuminance()
+                        ill.header.frame_id = self.child_frame_id
+                        ill.header.stamp = rospy.Time.now()
+                        ill.illuminance = l
+
+                        light_pub.publish(ill)
                     else:
                         print 'Unknown sensor:', sensor
 
