@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
-import roslib; roslib.load_manifest('face_frame')
+import roslib; roslib.load_manifest('glass_ros_bridge')
 import rospy
 
-from sensor_msgs.msg import PointCloud
-from geometry_msgs.msg import PointStamped
+from people_msgs.msg import PositionMeasurement
+from geometry_msgs.msg import PointStamped, PoseStamped
 
 import tf
 from tf.transformations import quaternion_from_euler
 
-from math import sqrt, atan2
+from math import sqrt, atan2, pi
 
 
 class HeadFrame:
@@ -17,34 +17,41 @@ class HeadFrame:
         self.found_face = False
 
         # Set up a tf broadcaster
-        broadcaster = tf.TransformBroadcaster()
+        self.broadcaster = tf.TransformBroadcaster()
+
+        # Set up a tf listener
+        self.listener = tf.TransformListener()
 
         # Set up the face detector callback
-        self.sub = rospy.Subscriber('face_detector/faces_cloud',
-                                    PointCloud,
+        self.sub = rospy.Subscriber('/face_detector/people_tracker_measurements',
+                                    PositionMeasurement,
                                     self.face_callback)
 
     def face_callback(self, msg):
-        if len(msg.points) > 0 and not self.found_face:
-            # Pick the closest detected face
-            v,i = min(msg.points.z)
-
-            # Transform the face position into the base_link frame
+        if not self.found_face:
             face = PointStamped()
             face.header = msg.header
-            face.point = msg.points[i]
-            face = self.listener.transformPoint('base_link', face)
-
-            # Set the origin of the face (in base_link)
-            self.origin = (face.point.x, face.point.y, face.point.z)
-
-            # Set the angles of the face frame.  Fake it for now, by
-            # looking at (0, 0, 1.2) in base_link
+            face.point = msg.pos
+            self.listener.waitForTransform(face.header.frame_id, 'base_link', rospy.Time.now(), rospy.Duration(5.0))
             d = sqrt(face.point.x * face.point.x + face.point.y * face.point.y)
-            self.quaternion = quaternion_from_euler(0.0, # roll
-                                                    atan2(1.2, d), # pitch
-                                                    atan2(face.point.y,  # yaw
-                                                          face.point.z))
+       
+            # Change the axes from camera-type axes 
+            self.quaternion = quaternion_from_euler(pi/2, pi/2, 0.0)
+            pose = PoseStamped()
+            pose.header = face.header
+            pose.pose.position = face.point
+            pose.pose.orientation.x = self.quaternion[0]
+            pose.pose.orientation.y = self.quaternion[1]
+            pose.pose.orientation.z = self.quaternion[2]
+            pose.pose.orientation.w = self.quaternion[3]
+
+            # Transform to base_link
+            pose = self.listener.transformPose('base_link', pose)
+            face = pose.pose.position
+            self.quaternion = (pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w)
+
+
+            self.origin = (face.x, face.y, face.z)
 
             # Flip the bit
             self.found_face = True
@@ -54,11 +61,11 @@ class HeadFrame:
 
         while not rospy.is_shutdown():
             if self.found_face:
-                broadcaster.sendTransform(self.origin,
+                self.broadcaster.sendTransform(self.origin,
                                           self.quaternion,
                                           rospy.Time.now(),
-                                          'head',
-                                          'base_link')
+                                          '/face_detection',
+                                          '/base_link')
             r.sleep()
 
 
