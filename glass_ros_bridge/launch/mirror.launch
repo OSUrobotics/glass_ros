@@ -1,0 +1,4 @@
+<launch>
+  <include file="$(find glass_ros_bridge )/launch/bridge.launch"/>
+  <node name="point_head" pkg="glass_ros_bridge" type="move_head.py"/>
+</launch>
