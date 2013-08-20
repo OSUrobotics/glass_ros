@@ -38,7 +38,7 @@ if __name__ == '__main__':
         gaze_point.target.header.frame_id = 'glass'
         gaze_point.pointing_frame = 'high_def_optical_frame'
         gaze_point.min_duration = rospy.Duration(0.01)
-        gaze_point.max_velocity = 10.0
+        gaze_point.max_velocity = 1.0
         gaze_point.target.header.stamp = rospy.Time.now()
         gaze_point.target.point.x = 1
         gaze_point.target.point.y = 0
