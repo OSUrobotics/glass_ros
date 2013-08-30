@@ -8,9 +8,11 @@ from sensor_msgs.msg import Imu, Illuminance
 from geometry_msgs.msg import PoseStamped
 
 # See enum values at http://developer.android.com/reference/android/hardware/Sensor.html
-TYPE_ACCELEROMETER = 1
-TYPE_ORIENTATION   = 3
-TYPE_LIGHT         = 5
+TYPE_ACCELEROMETER   = 1
+TYPE_ORIENTATION     = 3
+TYPE_GYROSCOPE       = 4
+TYPE_LIGHT           = 5
+TYPE_ROTATION_VECTOR = 11
 
 class SocketHandler(SocketServer.BaseRequestHandler):
     child_frame_id = 'glass'
@@ -22,6 +24,11 @@ class SocketHandler(SocketServer.BaseRequestHandler):
         self.pose_pub = rospy.Publisher('/android/pose', PoseStamped)
         self.light_pub = rospy.Publisher('/android/light', Illuminance)
         self.glass_base_frame = '/face_detection'
+        self.imu = Imu()
+        self.imu.orientation_covariance = numpy.eye(3).flatten().tolist()
+        self.imu.angular_velocity_covariance = numpy.eye(3).flatten().tolist()
+        self.imu.linear_acceleration_covariance = numpy.eye(3).flatten().tolist()
+        self.imu_ready = [False, False, False]
         print "Made broadcaster"
         self.data = self.request.recv(16)
         while not rospy.is_shutdown() and self.data:
@@ -42,15 +49,53 @@ class SocketHandler(SocketServer.BaseRequestHandler):
                     elif sensor == TYPE_ACCELEROMETER:
                         ax, ay, az = struct.unpack('>3f', self.data[4:])
                         print 'IMU', ax, ay, az
-                        imu = Imu()
-                        imu.header.frame_id = self.glass_base_frame
-                        imu.header.stamp = rospy.Time.now()
-                        imu.orientation.w = 1
-                        imu.linear_acceleration.x = ax
-                        imu.linear_acceleration.y = ay
-                        imu.linear_acceleration.z = az
+                        
+                        self.imu.header.frame_id = self.glass_base_frame
+                        self.imu.header.stamp = rospy.Time.now()
+                        self.imu.orientation.w = 1
+                        self.imu.linear_acceleration.x = ax
+                        self.imu.linear_acceleration.y = ay
+                        self.imu.linear_acceleration.z = az
 
-                        self.imu_pub.publish(imu)
+                        self.imu_ready[0] = True
+
+                        if all(self.imu_ready):
+                            self.imu_ready = [False, False, False]
+                            self.imu_pub.publish(self.imu)
+
+                    elif sensor == TYPE_GYROSCOPE:
+                        self.imu.header.frame_id = self.glass_base_frame
+                        self.imu.header.stamp = rospy.Time.now()
+
+                        vx, vy, vz = struct.unpack('>3f', self.data[4:])
+
+                        self.imu.angular_velocity.x = vx
+                        self.imu.angular_velocity.y = vy
+                        self.imu.angular_velocity.z = vz
+
+                        self.imu_ready[1] = True
+
+                        if all(self.imu_ready):
+                            self.imu_ready = [False, False, False]
+                            self.imu_pub.publish(self.imu)
+
+                    elif sensor == TYPE_ROTATION_VECTOR:
+                        self.imu.header.frame_id = self.glass_base_frame
+                        self.imu.header.stamp = rospy.Time.now()
+
+                        rpy = numpy.radians(struct.unpack('>3f', self.data[4:]))
+                        quat = quaternion_from_euler(*rpy)
+                        self.imu.orientation.x = quat[0]
+                        self.imu.orientation.y = quat[1]
+                        self.imu.orientation.z = quat[2]
+                        self.imu.orientation.w = quat[3]
+
+                        self.imu_ready[2] = True
+
+                        if all(self.imu_ready):
+                            self.imu_ready = [False, False, False]
+                            self.imu_pub.publish(self.imu)
+
                     elif sensor == TYPE_LIGHT:
                         l, _, _ = struct.unpack('>3f', self.data[4:])
                         print 'Light', l
@@ -66,11 +111,13 @@ class SocketHandler(SocketServer.BaseRequestHandler):
                 except Exception, e:
                     if type(e) == struct.error:
                         print "Couldn't unpack ", self.data.__repr__(), 'with length', len(self.data)
+                    else:
+                        print e
             self.data = self.request.recv(16)
         print 'Disconnect'
 
 if __name__ == "__main__":
-    HOST, PORT = "192.168.43.202", 9999
+    HOST, PORT = "192.168.0.158", 9999
     if len(sys.argv) > 1:
         HOST, PORT = sys.argv[1], int(sys.argv[2])
     print 'Listening on %s:%s' % (HOST, PORT)
