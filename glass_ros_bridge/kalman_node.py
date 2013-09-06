@@ -24,8 +24,6 @@ class KalmanFilter(object):
         # self.sz = z.shape # size of array
         self.sz = (1,dim)
 
-        self.Q = 1e-5 # process variance
-
         self.tmat =  np.matrix([ 
         #   [ax, ay, az, vr, vp, vh, vx, vy, vz, x,  y,  z,  r,  p,  h]
             [1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0], # = ax
@@ -48,32 +46,49 @@ class KalmanFilter(object):
 
         # allocate space for arrays
         self.xhat = np.zeros(self.sz)      # a posteri estimate of x
-        self.P = np.zeros(self.sz)         # a posteri error estimate
+
+        # self.P = np.zeros(self.sz)         # a posteri error estimate
+        self.P = np.asmatrix(np.zeros((dim,dim)))
+
         self.xhatminus = np.zeros(self.sz) # a priori estimate of x
-        self.Pminus = np.zeros(self.sz)    # a priori error estimate
+
+        # self.Pminus = np.zeros(self.sz)    # a priori error estimate
+        self.Pminus = np.asmatrix(np.zeros((dim,dim)))
+
         self.K = np.zeros(self.sz)         # gain or blending factor
+
         self.state = np.zeros(15)
 
-        self.R = 0.1**2 # estimate of measurement variance, change to see effect
+        # self.R = 0.1**2 # estimate of measurement variance, change to see effect
+        self.R = np.asmatrix(np.eye(dim)) * 0.1**1
+        # self.Q = 1e-5 # process variance
+        self.Q = np.asmatrix(np.eye(dim)) * 1e-5
+
 
         # intial guesses
         # self.xhat[0] = 0.0
         # self.P[0] = 1.0
 
     def update(self, z, dt=1.0):
+        # import pdb; pdb.set_trace()
+
         # time update
         self.xhatminus = self.xhat
         self.Pminus = self.P+self.Q
 
         # measurement update
-        self.K = self.Pminus/(self.Pminus+self.R)
-        self.xhat = self.xhatminus + self.K*(z-self.xhatminus)
-        self.P = (1-self.K) * self.Pminus
+        self.K = np.nan_to_num(self.Pminus/(self.Pminus+self.R))
+
+        # self.xhat = self.xhatminus + self.K*(z-self.xhatminus)
+        self.xhat = self.xhatminus + (z.T - self.xhatminus)*self.K
+
+        self.P = (np.eye(self.sz[1])-self.K) * self.Pminus
 
         # update the velocities and positions based on the filtered IMU data
         tmatdt = np.matrix(self.tmat, dtype=np.float64)
         tmatdt[np.nonzero(tmatdt == 2)] = dt
 
+        # import pdb; pdb.set_trace()
         self.state[:self.xhat.shape[1]] = self.xhat
         self.state = np.asarray(tmatdt * np.asmatrix(self.state).T).squeeze()
 
@@ -84,7 +99,9 @@ filt = None
 last_time = None
 odom_pub = None
 odom_pose_pub = None
+imu_pub = None
 
+bias = np.matrix([0, -0.014, 0.012, 0.0003, 0.0003, 0.0002]).T
 
 def imu_cb(msg):
     time = msg.header.stamp
@@ -93,8 +110,16 @@ def imu_cb(msg):
     if last_time:
         ang = msg.angular_velocity
         lin = msg.linear_acceleration
-        # signal = np.matrix([lin.x, lin.y, lin.z, ang.x, ang.y, ang.z]).T
-        signal = np.matrix([lin.x-9.973, lin.y, lin.z, ang.x, ang.y, ang.z]).T
+        signal = np.matrix([
+            0.0,
+            lin.y, # if abs(lin.y) > 0.025 else 0,
+            lin.z, # if abs(lin.z) > 0.025 else 0,
+            ang.x,
+            ang.y,
+            ang.z]
+        ).T - bias
+        # print signal
+        # signal = np.matrix([lin.x-9.973, lin.y, lin.z, ang.x, ang.y, ang.z]).T
         estimate, state = np.asarray(filt.update(signal, (time-last_time).to_sec())).flatten()
         # print state[9] + '\t', state[10] + '\t' + state[11]
         odom = Odometry()
@@ -108,9 +133,15 @@ def imu_cb(msg):
         twist = odom.twist.twist
 
         pose.position.x, pose.position.y, pose.position.z = state[9:12]
+        pose.position.x = 0
+        # print '%0.4f, %0.4f, %0.4f' % tuple(state[9:12])
+        # print '\t'.join('%0.4f' % n for n in signal[:3])
         # pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w = 
 
         twist.angular.x, twist.angular.y, twist.angular.z = state[12:15]
+
+        # print '%s, %s, %s, %s, %s, %s' % tuple(np.asarray(estimate[0,:6]).squeeze().tolist())
+        print '%s, %s, %s, %s, %s, %s' % tuple(np.asarray(signal).squeeze().tolist())
 
         odom_pub.publish(odom)
         odom_pose_pub.publish(ps)
@@ -124,6 +155,7 @@ if __name__ == '__main__':
     rospy.init_node('imu_kalman')
     odom_pub = rospy.Publisher('/android/odom', Odometry)
     odom_pose_pub = rospy.Publisher('/android/odom_pose', PoseStamped)
+    imu_pub = rospy.Publisher('/android/imu_filtered', Imu)
 
     rospy.Subscriber('/android/imu', Imu, imu_cb)
     rospy.spin()
