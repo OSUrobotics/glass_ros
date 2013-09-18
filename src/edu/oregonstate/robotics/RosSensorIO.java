@@ -22,7 +22,7 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 	private Sensor mOrientation, mAcceleration, mIlluminance, mProximity, mGyro, mRotation;
 
 	
-	RosSensorIO(SensorManager sensorManager, String serverName, int port) {
+	public RosSensorIO(SensorManager sensorManager, String serverName, int port) {
 		this.serverName = serverName;
 		this.port = port;
 		this.mSensorManager = sensorManager;
@@ -33,7 +33,7 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 		}
 		
 		mOrientation = mSensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION);
-		mAcceleration = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+		mAcceleration = mSensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
 		mGyro = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
 		mRotation = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
 		mIlluminance = mSensorManager.getDefaultSensor(Sensor.TYPE_LIGHT);
@@ -63,7 +63,7 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 	}
 	
 	public void sendAcceleration(float ax, float ay, float az) {
-		this.sendPrefixedTriplet(Sensor.TYPE_ACCELEROMETER, ax, ay, az);
+		this.sendPrefixedTriplet(Sensor.TYPE_LINEAR_ACCELERATION, ax, ay, az);
 	}
 	public void sendGyro(float vx, float vy, float vz) {
 		this.sendPrefixedTriplet(Sensor.TYPE_GYROSCOPE, vx, vy, vz);
@@ -115,7 +115,7 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 			float roll_angle = event.values[2];
 			// Do something with these orientation angles.
 			this.sendOrientation(roll_angle, pitch_angle, azimuth_angle);
-		} else if(Sensor.TYPE_ACCELEROMETER == event.sensor.getType()) {
+		} else if(Sensor.TYPE_LINEAR_ACCELERATION == event.sensor.getType()) {
 			float az = event.values[0];
 			float ay = event.values[1];
 			float ax = event.values[2];
