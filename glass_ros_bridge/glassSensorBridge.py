@@ -8,11 +8,12 @@ from sensor_msgs.msg import Imu, Illuminance
 from geometry_msgs.msg import PoseStamped
 
 # See enum values at http://developer.android.com/reference/android/hardware/Sensor.html
-TYPE_ACCELEROMETER   = 1
-TYPE_ORIENTATION     = 3
-TYPE_GYROSCOPE       = 4
-TYPE_LIGHT           = 5
-TYPE_ROTATION_VECTOR = 11
+TYPE_ACCELEROMETER       = 1
+TYPE_ORIENTATION         = 3
+TYPE_GYROSCOPE           = 4
+TYPE_LIGHT               = 5
+TYPE_LINEAR_ACCELERATION = 10
+TYPE_ROTATION_VECTOR     = 11
 
 class SocketHandler(SocketServer.BaseRequestHandler):
     child_frame_id = 'glass'
@@ -46,7 +47,7 @@ class SocketHandler(SocketServer.BaseRequestHandler):
                         pose_msg.pose.orientation.w = 1
                         self.pose_pub.publish(pose_msg)
                         self.br.sendTransform((0,0,0), quat, stamp, self.child_frame_id, self.glass_base_frame)
-                    elif sensor == TYPE_ACCELEROMETER:
+                    elif sensor == TYPE_LINEAR_ACCELERATION:
                         ax, ay, az = struct.unpack('>3f', self.data[4:])
                         print 'IMU', ax, ay, az
                         
