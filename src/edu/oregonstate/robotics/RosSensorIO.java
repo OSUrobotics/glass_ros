@@ -35,7 +35,6 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 		mOrientation = mSensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION);
 		mAcceleration = mSensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
 		mGyro = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-		mRotation = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
 		mIlluminance = mSensorManager.getDefaultSensor(Sensor.TYPE_LIGHT);
 		mProximity = mSensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
 	}
@@ -74,7 +73,22 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 	
 	public void sendOrientation(float roll, float pitch, float yaw) {
 //		this.sendPrefixedTriplet(Sensor.TYPE_ORIENTATION, -roll, pitch, -yaw+180);
-		this.sendPrefixedTriplet(Sensor.TYPE_ORIENTATION, -roll, pitch+90, -yaw-70);
+//		this.sendPrefixedTriplet(Sensor.TYPE_ORIENTATION, -roll, pitch+90, -yaw-70);
+		String formatted = String.format("%d;%d;%d;", (int)yaw, (int)pitch, (int)roll);
+		try {
+			this.outStream.writeUTF(formatted);
+		} catch (IOException e) {
+			Log.w("RosSensorIO", "IO Exception: trying to reconnect");
+			try {
+				this.client.close();
+				this.run();
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+			
+		} catch (Exception e) {
+			Log.w("RosSensorIO", "Error sending data");
+		}
 
 	}
 	
@@ -98,12 +112,12 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 		//		SensorManager.SENSOR_DELAY_NORMAL);
 		//mSensorManager.registerListener(this, mProximity,
 		//		SensorManager.SENSOR_DELAY_NORMAL);
-		mSensorManager.registerListener(this, mAcceleration,
-				SensorManager.SENSOR_DELAY_NORMAL);
-		mSensorManager.registerListener(this, mGyro,
-				SensorManager.SENSOR_DELAY_NORMAL);
-		mSensorManager.registerListener(this, mRotation,
-				SensorManager.SENSOR_DELAY_NORMAL);
+//		mSensorManager.registerListener(this, mAcceleration,
+//				SensorManager.SENSOR_DELAY_NORMAL);
+//		mSensorManager.registerListener(this, mGyro,
+//				SensorManager.SENSOR_DELAY_NORMAL);
+//		mSensorManager.registerListener(this, mRotation,
+//				SensorManager.SENSOR_DELAY_NORMAL);
 	}
 
 	
