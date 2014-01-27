@@ -14,6 +14,10 @@ import rospy
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import Imu
+from tf.transformations import quaternion_from_euler
+
+from highpass import HighPassFilter
+
 # from testdata import data as z
 # z = z[:300,:]
 
@@ -101,7 +105,9 @@ odom_pub = None
 odom_pose_pub = None
 imu_pub = None
 
-bias = np.matrix([0, -0.014, 0.012, 0.0003, 0.0003, 0.0002]).T
+# bias = np.matrix([0, -0.014, 0.012, 0.0003, 0.0003, 0.0002]).T
+
+highpass = HighPassFilter(0.8)
 
 def imu_cb(msg):
     time = msg.header.stamp
@@ -117,7 +123,11 @@ def imu_cb(msg):
             ang.x,
             ang.y,
             ang.z]
-        ).T - bias
+        ).T
+
+        # signal = highpass.filter(signal)
+
+
         # print signal
         # signal = np.matrix([lin.x-9.973, lin.y, lin.z, ang.x, ang.y, ang.z]).T
         estimate, state = np.asarray(filt.update(signal, (time-last_time).to_sec())).flatten()
@@ -125,7 +135,8 @@ def imu_cb(msg):
         odom = Odometry()
         odom.header = msg.header
         odom.header.frame_id = '/face_detection'
-        odom.child_frame_id = '/glass'
+        # odom.child_frame_id = '/glass'
+        odom.child_frame_id = '/face_detection'
         pose = odom.pose.pose
         ps = PoseStamped()
         ps.header = odom.header
@@ -133,12 +144,15 @@ def imu_cb(msg):
         twist = odom.twist.twist
 
         pose.position.x, pose.position.y, pose.position.z = state[9:12]
-        pose.position.x = 0
+        # pose.position.x = 0
+
         # print '%0.4f, %0.4f, %0.4f' % tuple(state[9:12])
         # print '\t'.join('%0.4f' % n for n in signal[:3])
-        # pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w = 
+        quat = quaternion_from_euler(*state[12:15])
+        pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w = quat
 
-        twist.angular.x, twist.angular.y, twist.angular.z = state[12:15]
+        # twist.angular.x, twist.angular.y, twist.angular.z = state[12:15]
+        twist.angular.x, twist.angular.y, twist.angular.z = state[3:6]
 
         # print '%s, %s, %s, %s, %s, %s' % tuple(np.asarray(estimate[0,:6]).squeeze().tolist())
         print '%s, %s, %s, %s, %s, %s' % tuple(np.asarray(signal).squeeze().tolist())
