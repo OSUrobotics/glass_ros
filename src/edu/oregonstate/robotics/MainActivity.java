@@ -12,6 +12,7 @@ import android.hardware.SensorManager;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -97,9 +98,15 @@ public class MainActivity extends Activity {
 				String scannedIp = intent.getStringExtra("SCAN_RESULT");
 				String[] parts = scannedIp.split(":");
 				if(parts.length == 2) {
-					this.sensorIO = new RosSensorIO((SensorManager) getSystemService(Context.SENSOR_SERVICE), parts[0], Integer.parseInt(parts[1]));
-							Thread clientThread = new Thread(this.sensorIO);
-							clientThread.start();
+					Toast.makeText(this, "Connecting to " + scannedIp, Toast.LENGTH_SHORT);
+					this.sensorIO = new RosSensorIO(
+							this, 
+							(SensorManager) getSystemService(Context.SENSOR_SERVICE), 
+							parts[0], 
+							Integer.parseInt(parts[1])
+					);
+					Thread clientThread = new Thread(this.sensorIO);
+					clientThread.start();
 				} else {
 					Toast.makeText(this, "Invalid Address Format. Shold be 'IP:Port'", Toast.LENGTH_LONG).show();
 					scanCode();
@@ -107,4 +114,16 @@ public class MainActivity extends Activity {
 			}
 		}
 	}
+
+	//TODO this really should go in RosSensorIO.java if possible
+    public boolean onKeyDown(int keycode, KeyEvent event) {
+        if (keycode == KeyEvent.KEYCODE_DPAD_CENTER) {
+            this.sensorIO.sendTap();
+            return true;
+        }
+        
+        return false;
+    }
+
+	
 }

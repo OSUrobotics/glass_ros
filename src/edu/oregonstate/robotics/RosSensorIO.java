@@ -6,10 +6,15 @@ import java.nio.ByteBuffer;
 import java.util.List;
 
 import android.util.Log;
+import android.content.Context;
+import android.content.IntentFilter;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+
+import com.google.android.glass.eye.EyeGesture;
+import com.google.android.glass.eye.EyeGestureManager;
 
 public class RosSensorIO implements Runnable, SensorEventListener {
 	Socket client;
@@ -18,14 +23,24 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 	int port;
 	private static final String LOG_TAG = "SensorTest";
 	private SensorManager mSensorManager;
+	
+	private EyeGestureManager mEyeGestureManager;
+	private WinkReceiver mEyeEventReceiver;
+	private WinkReceiver.EyeEventListener mEyeEventListener;
 
+	public static byte TYPE_WINK = 98;
+	public static byte TYPE_TAP  = 99;
+
+	private Context mContext;
+	
 	private Sensor mOrientation, mAcceleration, mIlluminance, mProximity, mGyro, mRotation;
 
 	
-	public RosSensorIO(SensorManager sensorManager, String serverName, int port) {
+	public RosSensorIO(Context context, SensorManager sensorManager, String serverName, int port) {
 		this.serverName = serverName;
 		this.port = port;
 		this.mSensorManager = sensorManager;
+		this.mContext = context;
 		
 		List<Sensor> sensors = mSensorManager.getSensorList(Sensor.TYPE_ALL);
 		for(Sensor sensor : sensors) {
@@ -38,6 +53,31 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 		mRotation = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
 		mIlluminance = mSensorManager.getDefaultSensor(Sensor.TYPE_LIGHT);
 		mProximity = mSensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
+		
+		
+		mEyeGestureManager = EyeGestureManager.from(mContext);
+		
+		mEyeEventListener = new WinkReceiver.EyeEventListener() {
+			@Override
+			public void onWink() {
+//				RosSensorIO.this.sendWink();
+			}
+
+			@Override
+			public void onDoubleBlink() {
+				RosSensorIO.this.sendWink();
+			}
+		};
+
+		
+		mEyeEventReceiver = new WinkReceiver(mEyeEventListener);
+		mEyeGestureManager.stopDetector(EyeGesture.DOUBLE_BLINK);
+		mEyeGestureManager.stopDetector(EyeGesture.WINK);
+		mEyeGestureManager.enableDetectorPersistently(EyeGesture.DOUBLE_BLINK, true);
+		mEyeGestureManager.enableDetectorPersistently(EyeGesture.WINK, true);
+		IntentFilter eyeFilter = new IntentFilter("com.google.glass.action.EYE_GESTURE");
+		eyeFilter.setPriority(3000);
+		mContext.registerReceiver(mEyeEventReceiver, eyeFilter);
 	}
 	
 	private synchronized void sendPrefixedTriplet(int prefix, float a, float b, float c) {
@@ -81,7 +121,16 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 	public void sendLight(float l) {
 		this.sendPrefixedTriplet(Sensor.TYPE_LIGHT, l, 0, 0);
 	}
+	
+	public void sendTap() {
+		this.sendPrefixedTriplet(TYPE_TAP, 0, 0, 0);
+	}
 
+	public void sendWink() {
+		this.sendPrefixedTriplet(TYPE_WINK, 0, 0, 0);
+	}
+	
+	
 	public void run() {
 		try {
 			this.client = new Socket(this.serverName, this.port);
@@ -98,12 +147,12 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 		//		SensorManager.SENSOR_DELAY_NORMAL);
 		//mSensorManager.registerListener(this, mProximity,
 		//		SensorManager.SENSOR_DELAY_NORMAL);
-		mSensorManager.registerListener(this, mAcceleration,
-				SensorManager.SENSOR_DELAY_NORMAL);
-		mSensorManager.registerListener(this, mGyro,
-				SensorManager.SENSOR_DELAY_NORMAL);
-		mSensorManager.registerListener(this, mRotation,
-				SensorManager.SENSOR_DELAY_NORMAL);
+//		mSensorManager.registerListener(this, mAcceleration,
+//				SensorManager.SENSOR_DELAY_NORMAL);
+//		mSensorManager.registerListener(this, mGyro,
+//				SensorManager.SENSOR_DELAY_NORMAL);
+//		mSensorManager.registerListener(this, mRotation,
+//				SensorManager.SENSOR_DELAY_NORMAL);
 	}
 
 	
