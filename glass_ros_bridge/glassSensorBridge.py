@@ -6,6 +6,7 @@ import rospy, tf, numpy
 from tf.transformations import quaternion_from_euler
 from sensor_msgs.msg import Imu, Illuminance
 from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import Empty
 
 # See enum values at http://developer.android.com/reference/android/hardware/Sensor.html
 TYPE_ACCELEROMETER       = 1
@@ -14,6 +15,8 @@ TYPE_GYROSCOPE           = 4
 TYPE_LIGHT               = 5
 TYPE_LINEAR_ACCELERATION = 10
 TYPE_ROTATION_VECTOR     = 11
+TYPE_WINK                = 98
+TYPE_TAP                 = 99
 
 class SocketHandler(SocketServer.BaseRequestHandler):
     child_frame_id = 'glass'
@@ -24,6 +27,7 @@ class SocketHandler(SocketServer.BaseRequestHandler):
         self.imu_pub = rospy.Publisher('/android/imu', Imu)
         self.pose_pub = rospy.Publisher('/android/pose', PoseStamped)
         self.light_pub = rospy.Publisher('/android/light', Illuminance)
+        self.click_pub = rospy.Publisher('/click', Empty)
         self.glass_base_frame = '/face_detection'
         self.imu = Imu()
         self.imu.orientation_covariance = numpy.eye(3).flatten().tolist()
@@ -105,7 +109,16 @@ class SocketHandler(SocketServer.BaseRequestHandler):
                         ill.header.stamp = rospy.Time.now()
                         ill.illuminance = l
 
-                        light_pub.publish(ill)
+                        self.light_pub.publish(ill)
+
+                    elif sensor == TYPE_TAP:
+                        print 'Click'
+                        self.click_pub.publish()
+
+                    elif sensor == TYPE_WINK:
+                        print 'Click (wink)'
+                        self.click_pub.publish()
+
                     else:
                         print 'Unknown sensor:', sensor
 
@@ -117,16 +130,22 @@ class SocketHandler(SocketServer.BaseRequestHandler):
             self.data = self.request.recv(16)
         print 'Disconnect'
 
+def _maybe_shutdown(self):
+    if rospy.is_shutdown():
+        server.shutdown()
+
 if __name__ == "__main__":
     HOST, PORT = "192.168.0.158", 9999
     if len(sys.argv) > 1:
         HOST, PORT = sys.argv[1], int(sys.argv[2])
     print 'Listening on %s:%s' % (HOST, PORT)
+
     # Create the server, binding to localhost on port 9999
     server = SocketServer.TCPServer((HOST, PORT), SocketHandler)
 
     rospy.init_node('glass_sensor_bridge')
     print 'ROS Node started. Listening for messages.'
 
+    rospy.Timer(rospy.Duration(1.0), _maybe_shutdown)
+
     server.serve_forever()
-    server.close()
