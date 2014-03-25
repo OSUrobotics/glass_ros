@@ -121,6 +121,7 @@ class SocketHandler(SocketServer.BaseRequestHandler):
 
                     else:
                         print 'Unknown sensor:', sensor
+                        import pdb; pdb.set_trace()
 
                 except Exception, e:
                     if type(e) == struct.error:

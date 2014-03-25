@@ -15,10 +15,15 @@ import android.hardware.SensorManager;
 
 import com.google.android.glass.eye.EyeGesture;
 import com.google.android.glass.eye.EyeGestureManager;
+import de.tavendo.autobahn.WebSocketConnection;
+import de.tavendo.autobahn.WebSocketException;
+import de.tavendo.autobahn.WebSocketHandler;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 public class RosSensorIO implements Runnable, SensorEventListener {
-	Socket client;
-	DataOutputStream outStream;
 	String serverName;
 	int port;
 	private static final String LOG_TAG = "SensorTest";
@@ -35,6 +40,7 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 	
 	private Sensor mOrientation, mAcceleration, mIlluminance, mProximity, mGyro, mRotation;
 
+	private final WebSocketConnection mConnection = new WebSocketConnection();
 	
 	public RosSensorIO(Context context, SensorManager sensorManager, String serverName, int port) {
 		this.serverName = serverName;
@@ -54,6 +60,30 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 		mIlluminance = mSensorManager.getDefaultSensor(Sensor.TYPE_LIGHT);
 		mProximity = mSensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
 		
+		
+		try {
+			Log.i(LOG_TAG, "ws://" + this.serverName + ":" + this.port);
+			this.mConnection.connect("ws://" + this.serverName + ":" + this.port, new WebSocketHandler(){
+				@Override
+				public void onOpen() {
+					advertise();
+					mSensorManager.registerListener(RosSensorIO.this, mOrientation,
+							SensorManager.SENSOR_DELAY_NORMAL);
+					mSensorManager.registerListener(RosSensorIO.this, mAcceleration,
+							SensorManager.SENSOR_DELAY_NORMAL);
+					mSensorManager.registerListener(RosSensorIO.this, mOrientation,
+							SensorManager.SENSOR_DELAY_NORMAL);
+
+
+
+				}
+			});
+//			this.advertise();
+		} catch (WebSocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
 		
 		mEyeGestureManager = EyeGestureManager.from(mContext);
 		
@@ -80,22 +110,30 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 		mContext.registerReceiver(mEyeEventReceiver, eyeFilter);
 	}
 	
+	private void advertise() {
+		try {
+			RosbridgeRequest winkAdvReq = RosbridgeRequest.advertise("click", "std_msgs/Empty");
+			RosbridgeRequest imuAdvReq = RosbridgeRequest.advertise("android/imu", "sensor_msgs/Imu");
+			RosbridgeRequest poseAdvReq = RosbridgeRequest.advertise("android/pose", "geometry_msgs/PoseStamped");
+			
+			this.mConnection.sendTextMessage(winkAdvReq.toString());
+			this.mConnection.sendTextMessage(imuAdvReq.toString());
+			this.mConnection.sendTextMessage(poseAdvReq.toString());
+			
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+//		winkAdvReq
+	}
+	
 	private synchronized void sendPrefixedTriplet(int prefix, float a, float b, float c) {
 		try {			
 			// this can be deserialized in python with struct.unpack('>3f', data[1:])
 			// the first byte is a char representing which sensor the data is from
 			ByteBuffer bb = ByteBuffer.allocate(16);
 			bb.putInt(prefix).putFloat(a).putFloat(b).putFloat(c);//.putInt(999).putInt(999);
-			this.outStream.write(bb.array());
-		} catch (IOException e) {
-			Log.w("RosSensorIO", "IO Exception: trying to reconnect");
-			try {
-				this.client.close();
-				this.run();
-			} catch (IOException e1) {
-				e1.printStackTrace();
-			}
-			
+//			this.outStream.write(bb.array());
 		} catch (Exception e) {
 			@SuppressWarnings("unused")
 			int q = 5;
@@ -103,7 +141,13 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 	}
 	
 	public void sendAcceleration(float ax, float ay, float az) {
-		this.sendPrefixedTriplet(Sensor.TYPE_LINEAR_ACCELERATION, ax, ay, az);
+//		this.sendPrefixedTriplet(Sensor.TYPE_LINEAR_ACCELERATION, ax, ay, az);
+		try {
+			this.mConnection.sendTextMessage(RosbridgeRequest.publishIMU("android/imu", ax, ay, az).toString());
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 	public void sendGyro(float vx, float vy, float vz) {
 		this.sendPrefixedTriplet(Sensor.TYPE_GYROSCOPE, vx, vy, vz);
@@ -115,6 +159,17 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 	public void sendOrientation(float roll, float pitch, float yaw) {
 //		this.sendPrefixedTriplet(Sensor.TYPE_ORIENTATION, -roll, pitch, -yaw+180);
 		this.sendPrefixedTriplet(Sensor.TYPE_ORIENTATION, -roll, pitch+90, -yaw-70);
+		float[] quat = new float[4];
+		SensorManager.getQuaternionFromVector(quat, new float[]{-roll, pitch+90, -yaw-70});
+		try {
+			this.mConnection.sendTextMessage(RosbridgeRequest.publishPose("android/pose", new float[]{0,0,0}, quat).toString());
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public void sendOrientation(float x, float y, float z, float w) {
 
 	}
 	
@@ -123,26 +178,28 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 	}
 	
 	public void sendTap() {
-		this.sendPrefixedTriplet(TYPE_TAP, 0, 0, 0);
+		try {
+			this.mConnection.sendTextMessage(RosbridgeRequest.publishEmpty("click").toString());
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	public void sendWink() {
-		this.sendPrefixedTriplet(TYPE_WINK, 0, 0, 0);
+//		this.sendPrefixedTriplet(TYPE_WINK, 0, 0, 0);
+		try {
+			this.mConnection.sendTextMessage(RosbridgeRequest.publishEmpty("click").toString());
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 	
 	
 	public void run() {
-		try {
-			this.client = new Socket(this.serverName, this.port);
-			OutputStream outToServer = client.getOutputStream();
-			outStream = new DataOutputStream(outToServer);
-		} catch (UnknownHostException e) {
-			Log.e("RosSensorIO", "UnknownHostException", e);
-		} catch (IOException e) {
-			Log.e("RosSensorIO", "IOException", e);
-		}
-		mSensorManager.registerListener(this, mOrientation,
-				SensorManager.SENSOR_DELAY_NORMAL);
+//		mSensorManager.registerListener(this, mOrientation,
+//				SensorManager.SENSOR_DELAY_NORMAL);
 		//mSensorManager.registerListener(this, mIlluminance,
 		//		SensorManager.SENSOR_DELAY_NORMAL);
 		//mSensorManager.registerListener(this, mProximity,
@@ -162,7 +219,6 @@ public class RosSensorIO implements Runnable, SensorEventListener {
 			float azimuth_angle = event.values[0];
 			float pitch_angle = event.values[1];
 			float roll_angle = event.values[2];
-			// Do something with these orientation angles.
 			this.sendOrientation(roll_angle, pitch_angle, azimuth_angle);
 		} else if(Sensor.TYPE_LINEAR_ACCELERATION == event.sensor.getType()) {
 			float az = event.values[0];
