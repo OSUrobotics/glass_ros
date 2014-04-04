@@ -135,12 +135,12 @@ def _maybe_shutdown(self):
         server.shutdown()
 
 if __name__ == "__main__":
-    HOST, PORT = "192.168.0.158", 9999
+    HOST, PORT = "0.0.0.0", 9999 # default to listening on all interfaces (INADDR_ANY)
     if len(sys.argv) > 1:
         HOST, PORT = sys.argv[1], int(sys.argv[2])
-    print 'Listening on %s:%s' % (HOST, PORT)
+    print 'Listening on %s:%s' % (HOST if HOST != "0.0.0.0" else "INADDR_ANY", PORT)
 
-    # Create the server, binding to localhost on port 9999
+    # Create the server, HOST:PORT
     server = SocketServer.TCPServer((HOST, PORT), SocketHandler)
 
     rospy.init_node('glass_sensor_bridge')
