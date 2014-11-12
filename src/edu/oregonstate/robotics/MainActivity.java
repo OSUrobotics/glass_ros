@@ -56,6 +56,8 @@ public class MainActivity extends Activity {
 		
 		text = (TextView) findViewById(R.id.text);
 
+//        text.setText(BuildConfig.VERSION_NAME + ": " + BuildConfig.VERSION_CODE);
+
 		locationText = (TextView) findViewById(R.id.location);
 
 		
@@ -64,12 +66,17 @@ public class MainActivity extends Activity {
 		for(String provider : providers ) {
 			Log.i(LOG_TAG, "Found provider: " + provider);
 		}
-		
-		// scan a barcode
-		scanCode();
-		// do the rest of this on the intent callback
-		// we're expecting a Text QR code in the form "aaa.bbb.ccc.ddd:pppp"
-		// http://zxing.appspot.com/generator/
+
+		// get the address/port
+        // we're expecting a Text QR code in the form "aaa.bbb.ccc.ddd:pppp"
+        if(this.getIntent().hasExtra("ROS_ADDR")) { // as an extra
+            String addr = this.getIntent().getStringExtra("ROS_ADDR");
+            this.startSensorIO(addr);
+        } else { // or by scanning a barcode
+            scanCode();
+            // do the rest of this on the intent callback
+            // http://zxing.appspot.com/generator/
+        }
 	}
 
 
@@ -90,24 +97,32 @@ public class MainActivity extends Activity {
 		intent.putExtra("SCAN_MODE", "QR_CODE_MODE");
 		startActivityForResult(intent, 0);
 	}
-	
+
+    private boolean startSensorIO(String addr) {
+        String[] parts = addr.split(":");
+        if(parts.length == 2) {
+            Toast.makeText(this, "Connecting to " + addr, Toast.LENGTH_SHORT);
+            this.sensorIO = new RosSensorIO(
+                    this,
+                    (SensorManager) getSystemService(Context.SENSOR_SERVICE),
+                    parts[0],
+                    Integer.parseInt(parts[1])
+            );
+            Thread clientThread = new Thread(this.sensorIO);
+            clientThread.start();
+            text.setText("Connected to " + addr + "\nSD=" + this.sensorIO.sd);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
 	@Override
 	public void onActivityResult(int requestCode, int resultCode, Intent intent) {
 		if (requestCode == 0) {
 			if (resultCode == RESULT_OK) {
 				String scannedIp = intent.getStringExtra("SCAN_RESULT");
-				String[] parts = scannedIp.split(":");
-				if(parts.length == 2) {
-					Toast.makeText(this, "Connecting to " + scannedIp, Toast.LENGTH_SHORT);
-					this.sensorIO = new RosSensorIO(
-							this, 
-							(SensorManager) getSystemService(Context.SENSOR_SERVICE), 
-							parts[0], 
-							Integer.parseInt(parts[1])
-					);
-					Thread clientThread = new Thread(this.sensorIO);
-					clientThread.start();
-				} else {
+				if(!startSensorIO(scannedIp)) {
 					Toast.makeText(this, "Invalid Address Format. Shold be 'IP:Port'", Toast.LENGTH_LONG).show();
 					scanCode();
 				}
