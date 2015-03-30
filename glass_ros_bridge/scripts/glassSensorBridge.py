@@ -22,19 +22,17 @@ class SocketHandler(SocketServer.BaseRequestHandler):
     child_frame_id = 'glass'
 
     def handle(self):
-        print "Handle"
         self.br = tf.TransformBroadcaster()
         self.imu_pub = rospy.Publisher('/android/imu', Imu)
-        self.pose_pub = rospy.Publisher('/android/pose', PoseStamped, tcp_nodelay=True, queue_size=1)
+        self.pose_pub = rospy.Publisher('/android/pose', PoseStamped, queue_size=1)
         self.light_pub = rospy.Publisher('/android/light', Illuminance)
         self.click_pub = rospy.Publisher('/click', Empty)
-        self.glass_base_frame = '/face_detection'
+        self.glass_base_frame = '/glass_adjust'
         self.imu = Imu()
         self.imu.orientation_covariance = numpy.eye(3).flatten().tolist()
         self.imu.angular_velocity_covariance = numpy.eye(3).flatten().tolist()
         self.imu.linear_acceleration_covariance = numpy.eye(3).flatten().tolist()
         self.imu_ready = [False, False, False]
-        print "Made broadcaster"
         self.data = self.request.recv(16)
         while not rospy.is_shutdown() and self.data:
             if self.data:
@@ -43,7 +41,6 @@ class SocketHandler(SocketServer.BaseRequestHandler):
                     if sensor == TYPE_ORIENTATION:
                         rpy = numpy.radians(struct.unpack('>3f', self.data[4:]))
                         quat = quaternion_from_euler(*rpy)
-                        print 'Orientation', quat
                         stamp = rospy.Time.now()
                         pose_msg = PoseStamped()
                         pose_msg.header.frame_id = self.child_frame_id
@@ -53,7 +50,6 @@ class SocketHandler(SocketServer.BaseRequestHandler):
                         self.br.sendTransform((0,0,0), quat, stamp, self.child_frame_id, self.glass_base_frame)
                     elif sensor == TYPE_LINEAR_ACCELERATION:
                         ax, ay, az = struct.unpack('>3f', self.data[4:])
-                        print 'IMU', ax, ay, az
                         
                         self.imu.header.frame_id = self.glass_base_frame
                         self.imu.header.stamp = rospy.Time.now()
@@ -103,7 +99,6 @@ class SocketHandler(SocketServer.BaseRequestHandler):
 
                     elif sensor == TYPE_LIGHT:
                         l, _, _ = struct.unpack('>3f', self.data[4:])
-                        print 'Light', l
                         ill = Illuminance()
                         ill.header.frame_id = self.child_frame_id
                         ill.header.stamp = rospy.Time.now()
@@ -120,11 +115,11 @@ class SocketHandler(SocketServer.BaseRequestHandler):
                         self.click_pub.publish()
 
                     else:
-                        print 'Unknown sensor:', sensor
+                        rospy.logwarn('Unknown sensor: %s' % sensor)
 
                 except Exception, e:
                     if type(e) == struct.error:
-                        print "Couldn't unpack ", self.data.__repr__(), 'with length', len(self.data)
+                        rospy.logwarn("Couldn't unpack %s with length %s" % (self.data.__repr__(), len(self.data)))
                     else:
                         print e
             self.data = self.request.recv(16)
