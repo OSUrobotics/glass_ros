@@ -50,7 +50,7 @@ class SocketHandler(SocketServer.BaseRequestHandler):
                         self.br.sendTransform((0,0,0), quat, stamp, self.child_frame_id, self.glass_base_frame)
                     elif sensor == TYPE_LINEAR_ACCELERATION:
                         ax, ay, az = struct.unpack('>3f', self.data[4:])
-                        
+
                         self.imu.header.frame_id = self.glass_base_frame
                         self.imu.header.stamp = rospy.Time.now()
                         self.imu.orientation.w = 1
