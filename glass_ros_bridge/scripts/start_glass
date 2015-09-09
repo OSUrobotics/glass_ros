@@ -1,5 +1,13 @@
-#!/usr/bin/env sh
-iface=$(route | grep "link-local" | awk '{print $8}')
+#!/usr/bin/env bash
+iface=$(route | grep "default" | awk '{print $8}')
 addr=$(ifconfig $iface | grep "inet addr" | awk -F: '{print $2}' | awk '{print $1}')
 echo "Starting Glass on $iface connecting to $addr"
+
+# wake the screen
+if [ "$(adb shell dumpsys power | grep mScreenOn= | grep -oE '(true|false)')" == false ] ; then
+    echo "Screen is off. Turning on."
+    adb shell input keyevent 26 # wakeup
+fi
+
+# start the activity
 adb shell am start -a android.intent.action.MAIN -n edu.oregonstate.robotics/.MainActivity -e ROS_ADDR $addr:9999
